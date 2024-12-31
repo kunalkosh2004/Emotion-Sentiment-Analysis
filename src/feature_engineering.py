@@ -3,6 +3,7 @@ import logging
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from gensim.models import Word2Vec
+import yaml
 
 log_dir = 'logs'
 os.makedirs(log_dir,exist_ok=True)
@@ -24,6 +25,23 @@ file_handler.setFormatter(formatter)
 
 logger.addHandler(console_handler)
 logger.addHandler(file_handler)
+
+def load_param(file_path:str) ->dict:
+    """Load parameters from a YAML file."""
+    try:
+        with open(file_path, 'r') as file:
+            params = yaml.safe_load(file)
+        logger.debug('Parameter retrieved from:%s',file_path)
+        return params
+    except FileNotFoundError:
+        logger.error('File not found: %s', file_path)
+        raise
+    except yaml.YAMLError as e:
+        logger.error('YAML error: %s', e)
+        raise
+    except Exception as e:
+        logger.error('Unexpected error: %s', e)
+        raise
 
 def load_data(data_path: str) -> pd.DataFrame:
     """Load data from a CSV file."""
@@ -75,10 +93,13 @@ def save_data(df: pd.DataFrame, file_path:str) -> None:
     
 def main():
     try:
+        params = load_param('params.yaml')
+        max_features = params['feature_engineering']['max_features']
+        
         train_data = load_data('./data/interm/train_pro.csv')
         test_data = load_data('./data/interm/test_pro.csv')
         
-        train_df,test_df = apply_tfidf(train_data,test_data,80)
+        train_df,test_df = apply_tfidf(train_data,test_data,max_features)
         
         save_data(train_df,os.path.join('./data','porcessed','train_tfidf.csv'))
         save_data(test_df,os.path.join('./data','porcessed','test_tfidf.csv'))

@@ -3,6 +3,7 @@ import logging
 import pandas as pd
 import numpy as np
 import pickle
+import yaml
 from sklearn.ensemble import RandomForestClassifier
 
 log_dir = 'logs'
@@ -26,6 +27,22 @@ file_handler.setFormatter(formatter)
 logger.addHandler(console_handler)
 logger.addHandler(file_handler)
 
+def load_param(file_path:str) ->dict:
+    """Load parameters from a YAML file."""
+    try:
+        with open(file_path, 'r') as file:
+            params = yaml.safe_load(file)
+        logger.debug('Parameter retrieved from:%s',file_path)
+        return params
+    except FileNotFoundError:
+        logger.error('File not found: %s', file_path)
+        raise
+    except yaml.YAMLError as e:
+        logger.error('YAML error: %s', e)
+        raise
+    except Exception as e:
+        logger.error('Unexpected error: %s', e)
+        raise
 
 def load_data(data_path: str) -> pd.DataFrame:
     """
@@ -48,7 +65,7 @@ def load_data(data_path: str) -> pd.DataFrame:
         logger.error('Unexpected error occurred while loading the data: %s', e)
         raise
     
-def train_model(X_train: np.ndarray, y_train: np.ndarray) -> RandomForestClassifier:
+def train_model(X_train: np.ndarray, y_train: np.ndarray,params:dict) -> RandomForestClassifier:
     """
     Train the RandomForest model.
     
@@ -62,7 +79,7 @@ def train_model(X_train: np.ndarray, y_train: np.ndarray) -> RandomForestClassif
             raise ValueError("The number of samples in X_train and y_train must be the same.")
         
         logger.debug('Initailizing RandomForestClassifier')
-        clf = RandomForestClassifier(n_estimators=80,random_state=22)
+        clf = RandomForestClassifier(n_estimators=params['n_estimators'],random_state=params['random_state'])
         clf.fit(X_train,y_train)
         
         logger.debug('Model training completed')
@@ -99,8 +116,8 @@ def main():
         train_data = load_data('./data/porcessed/train_tfidf.csv')
         X_train = train_data.iloc[:,:-1]
         y_train = train_data.iloc[:,-1]
-        
-        clf = train_model(X_train,y_train)
+        params = load_param('params.yaml')['model_building']
+        clf = train_model(X_train,y_train,params)
         
         model_save_path = 'models/model.pkl'
         save_model(clf,model_save_path)
