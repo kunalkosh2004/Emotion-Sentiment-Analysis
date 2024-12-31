@@ -1,7 +1,6 @@
 data
 models
 reports
-dvc.lock
 
 
 # Byte-compiled / optimized / DLL files
