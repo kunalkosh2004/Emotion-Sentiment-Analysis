@@ -1,11 +1,12 @@
 import os
 import logging
-from sklearn.metrics import classification_report
+from sklearn.metrics import accuracy_score,precision_score,recall_score,roc_auc_score
 import pandas as pd
 import numpy as np
 import pickle
 import json
 from dvclive import Live
+import yaml
 
 log_dir = 'logs'
 os.makedirs(log_dir,exist_ok=True)
@@ -27,6 +28,23 @@ file_handler.setFormatter(formatter)
 
 logger.addHandler(console_handler)
 logger.addHandler(file_handler)
+
+def load_param(file_path:str) ->dict:
+    """Load parameters from a YAML file."""
+    try:
+        with open(file_path, 'r') as file:
+            params = yaml.safe_load(file)
+        logger.debug('Parameter retrieved from:%s',file_path)
+        return params
+    except FileNotFoundError:
+        logger.error('File not found: %s', file_path)
+        raise
+    except yaml.YAMLError as e:
+        logger.error('YAML error: %s', e)
+        raise
+    except Exception as e:
+        logger.error('Unexpected error: %s', e)
+        raise
 
 def load_data(data_path:str) -> pd.DataFrame:
     """
@@ -69,13 +87,15 @@ def evaluate_model(clf,X_test: np.ndarray, y_test: np.ndarray) -> dict:
         y_pred = clf.predict(X_test)
         y_pred_proba = clf.predict_proba(X_test)[:, 1]
         
-        metrics = classification_report(y_test,y_pred,output_dict=True)
-        # precision = precision_score(y_test,y_pred)
-        # recall = recall_score(y_test,y_pred)
-        # roc_auc = roc_auc_score(y_test,y_pred)
+        metrics = accuracy_score(y_test,y_pred)
+        precision = precision_score(y_test,y_pred, average='weighted')
+        recall = recall_score(y_test,y_pred, average='weighted')
+        # roc_auc = roc_auc_score(y_test,y_pred, average='weighted', multi_class='ovr')
         
         metrics_dict = {
             "Accuracy":metrics,
+            "precision":precision,
+            "recall":recall
         }
         logger.debug('Model Evaluation metrics calculated')
         return metrics_dict
@@ -105,13 +125,14 @@ def main():
         clf = load_model('./models/model.pkl')
         
         metrics = evaluate_model(clf,X_test,y_test)
+        params = load_param('params.yaml')
         
-        # with Live(save_dvc_exp=True) as live:
-        #     live.log_metric('accuracy', confusion_matrix(y_test, y_test))
-            # live.log_metric('precision', precision_score(y_test, y_test))
-            # live.log_metric('recall', recall_score(y_test, y_test))
+        with Live(save_dvc_exp=True) as live:
+            live.log_metric('accuracy', accuracy_score(y_test, y_test))
+            live.log_metric('precision', precision_score(y_test, y_test, average='weighted'))
+            live.log_metric('recall', recall_score(y_test, y_test, average='weighted'))
 
-            # live.log_params(params)
+            live.log_params(params)
         
         save_metrics(metrics, 'reports/metrics.json')
     except Exception as e:
